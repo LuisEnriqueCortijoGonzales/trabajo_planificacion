@@ -18,7 +18,7 @@ El flujo principal consiste en:
 
 ## Integrantes del Equipo
 
-Un equipo diverso y apasionado de estudiantes está detrás de este proyecto, listo para sumergirse en el reino de las búsquedas y de la indexación multidimensional. Permítanos presentarnos:
+Un equipo diverso y apasionado de estudiantes está detrás de este proyecto:
 
 |    Luis Cortijo    |    Leandro Machaca    |    Enzo     | Jerimy Sandoval |
 | ----------- | ----------- | ----------- | ----------- |
