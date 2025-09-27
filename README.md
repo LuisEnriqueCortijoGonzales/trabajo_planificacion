@@ -1,133 +1,105 @@
-# Preprocesamiento del Dataset de Dinosaurios
+# 🦖 DinoClassifier — Clasificación de Dinosaurios con Deep Learning
 
-Este documento explica **qué hace** el script `prepare_data.py`, **por qué** lo hace y **cómo** usarlo para generar los splits `train/val/test` listos para entrenamiento y evaluación.
+## Descripción General
+Este proyecto implementa un sistema de clasificación automática de dinosaurios a partir de imágenes, combinando **preprocesamiento de datos**, **entrenamiento  de modelos CNN** y un **frontend interactivo en Gradio**.  
 
-> Este flujo cumple con los requisitos del Trabajo 6 (entrenar un modelo, guardar artefactos y preparar una API local), dejando la data en un formato reproducible y limpio para el entrenamiento y demo.
-
----
-
-## Objetivo del preprocesamiento
-
-1. **Estandarizar** la estructura del dataset a un formato clásico de visión por computadora:
-   ```
-   datasets/dinosaurs/
-     ├─ train/<Clase>/*.jpg
-     ├─ val/<Clase>/*.jpg
-     └─ test/<Clase>/*.jpg
-   ```
-
-2. **Asegurar calidad**: descartar imágenes corruptas o demasiado pequeñas y eliminar duplicados exactos.
-
-3. **Crear splits reproducibles** (train/val/test) con proporciones configurables.
-
-4. **Dejar metadatos** útiles para el entrenamiento y la API: clases, índices, estadísticas.
+El flujo principal consiste en:
+1. **Preparar los datos** (validación, limpieza, quitar duplicados y separación para train, val y test).
+2. **Entrenar modelos de visión profunda** con técnicas modernas de regularización y aumento de datos.
+3. **Desplegar un frontend interactivo**.
 
 ---
 
-## ¿Qué hace exactamente `prepare_data.py`?
+## Preparación de Datos
+Archivo: [`prepare_data.py`](prepare_data.py)
 
-### 1) Descubrimiento de clases por carpetas
-- **Qué**: Detecta cada subcarpeta dentro de `--src_dir` como una **clase** (p. ej. `Ankylosaurus`, `Tyrannosaurus`).
-- **Por qué**: Es el estándar en `torchvision.datasets.ImageFolder` y evita hardcodear nombres de clases.
+### Qué hace
+- **Valida imágenes**: descarta archivos corruptos o muy pequeños.
+- **Elimina duplicados**: usando hash SHA1 global con el fin de mantener el balance.
+- **Crea splits estratificados**: genera `train/`, `val/` y `test/` según proporciones definidas.
+- **Genera metadatos**: `class_index.json`, `classes.txt`, `dataset_stats.json`.
 
-### 2) Validación de imágenes (integridad y tamaño mínimo)
-- **Qué**: Abre cada archivo con **PIL**:
-  - Llama a `im.verify()` para comprobar integridad/encabezados.
-  - Reabre para leer `width × height` y descarta imágenes con lados < `--min_size` (default: 64 px).
-- **Por qué**:
-  - Evitamos fallos en entrenamiento por **archivos corruptos**.
-  - Imágenes **demasiado pequeñas** suelen ser miniaturas/íconos sin detalle → ruido para el modelo.
-
-### 3) Deduplicado por hash SHA-1 (opcional)
-- **Qué**: Calcula SHA-1 de los bytes de cada imagen y **omite** imágenes cuyo hash ya apareció.
-- **Por qué**:
-  - El **duplicado exacto** sesga el modelo (data leakage entre splits o sobreajuste).
-  - Mantener clases balanceadas mejora la generalización.
-- **Notas**: Se puede desactivar con `--no_dedup`.
-
-### 4) Split estratificado en **train/val/test**
-- **Qué**: Para **cada clase**:
-  - Mezcla aleatoriamente con semilla (`--seed`).
-  - Divide según `--train_ratio`, `--val_ratio`, `--test_ratio` (por defecto **0.70/0.15/0.15**).
-- **Por qué**:
-  - Asegura que **todas las clases** aparezcan en los tres splits.
-  - Mantiene **distribución por clase** similar entre splits.
-  - Permite un **test final** “intocable” para medir desempeño real.
-
-### 5) Copia o symlink de archivos
-- **Qué**: Escribe los archivos en `datasets/dinosaurs/{train,val,test}/<Clase>/...` usando:
-  - `--mode copy` (por defecto): copia física de archivos.
-  - `--mode link`: intenta **symlink** (ahorra espacio).
-- **Por qué**:
-  - **copy** es robusto y funciona en todos los sistemas (Windows, macOS, Linux).
-  - **link** es útil cuando el dataset ocupa mucho espacio (pero en Windows puede requerir permisos de admin).
-
-### 6) Metadatos generados
-- **`class_index.json`**: mapeo `índice → nombre de clase` (p. ej. `0: "Ankylosaurus"`).  
-- **`classes.txt`**: lista de clases (una por línea).
-- **`dataset_stats.json`**: resumen de conteos por clase y totales.
+### Por qué así
+- **Calidad asegurada**: evitar imágenes rotas o irrelevantes mejora el entrenamiento.
+- **Generalización**: el split 70/15/15 asegura entrenamiento, validación y testeo equilibrados.
+- **Escalabilidad**: admite limitar imágenes por clase y elegir opciones dentro de sus argumentos.
 
 ---
 
-## Parámetros importantes
+## Entrenamiento del Modelo
+Archivo: [`train.py`](train.py)
 
-- `--src_dir` *(obligatorio)*: carpeta origen con subcarpetas por clase.  
-- `--out_dir` *(default: `datasets/dinosaurs`)*: carpeta destino para los splits.
-- `--train_ratio --val_ratio --test_ratio` *(default: 0.70/0.15/0.15)*: deben **sumar 1.0**.
-- `--min_size` *(default: 64)*: descarta imágenes con cualquiera de los lados < `min_size`.
-- `--no_dedup`: desactiva deduplicado por SHA-1.
-- `--mode copy|link` *(default: copy)*: método de escritura de archivos en la salida.
-- `--max_per_class` *(default: 0 = sin límite)*: útil para prototipado/entrenamientos rápidos (cap por clase).
-- `--seed` *(default: 42)*: asegura reproducibilidad del split.
+### Modelos soportados
+- **ResNet18 / ResNet50**
+- **MobileNetV3-Large**
+- **EfficientNet-B0**
+
+Se usan pesos preentrenados en **ImageNet**, reemplazando la última capa por una adaptada a las clases de dinosaurios.
+
+### Estrategia de entrenamiento
+1. **Fase 1 (head training)**  
+   - Congela el backbone.
+   - Entrena solo la capa final (cabeza).
+   - Optimización rápida para adaptar a nuevas clases.
+2. **Fase 2 (fine-tuning)**  
+   - Descongela toda la red.
+   - Entrena con tasa de aprendizaje menor.
+   - Ajusta todo el modelo a las particularidades del dataset.
+
+### Mejoras aplicadas
+- **Data Augmentation fuerte**: crops, flips, jitter, perspectiva y rotaciones = más robustez.
+- **Mixup y CutMix**: combinaciones lineales o enmascaradas de imágenes para evitar overfitting.
+- **Label smoothing**: suaviza etiquetas para reducir sobreajuste.
+- **OneCycleLR**: scheduler dinámico que acelera convergencia.
+- **Early Stopping**: evita entrenamientos excesivos sin mejora.
+- **Weighted Sampler**: opcional, útil para datasets desbalanceados.
+
+### Resultados guardados
+- Pesos: `model.pth` (mejor modelo por testing).
+- Métricas: `metrics.json`.
+- Historia de entrenamiento: `history.json`.
+- Matriz de confusión: `confusion_matrix.png`.
+
+### Por qué así
+- **Dos fases**: acelera entrenamiento y evita mal ajuste inicial logrando ser ejecutado en local.
+- **Augmentations modernos**: generan robustez frente a variaciones del dataset.
+- **Mixup / CutMix**: Mejoran generalización en datasets pequeños/medianos.
 
 ---
 
-## Uso
+## Frontend
+Archivo: [`frontend.py`](frontend.py)
 
-### PowerShell (Windows)
-```powershell
-python prepare_data.py --src_dir dinosaur_dataset --out_dir datasets/dinosaurs --train_ratio 0.7 --val_ratio 0.15 --test_ratio 0.15 --mode copy
-```
+### Funcionalidades
+- **Carga de imágenes** vía interfaz Gradio.
+- **Predicciones Top-K** con probabilidades.
+- **GradioAPP**: Despliegue en la nube capaz de ser usado por cualquier persona con el link (mientras este activo el archivo).
+- **Configuración dinámica**: detección de arquitectura y clases desde el checkpoint.
 
-### Bash (Linux/macOS)
+### Por qué así
+- **Interpretabilidad**: Forma sencilla de ver los resultados.
+- **Usabilidad**: Gradio permite probar el modelo sin escribir código.
+- **Flexibilidad**: soporta múltiples arquitecturas (ResNet, MobileNet, EfficientNet).
+
+---
+
+## Cómo usar
+
+### 1. Preparar dataset
 ```bash
-python prepare_data.py --src_dir dinosaur_dataset --out_dir datasets/dinosaurs   --train_ratio 0.7 --val_ratio 0.15 --test_ratio 0.15 --mode copy
+python prepare_data.py --src_dir dinosaur_dataset --out_dir datasets/dinosaurs \
+  --train_ratio 0.7 --val_ratio 0.15 --test_ratio 0.15 --mode copy
 ```
-
-**Salida esperada**:
+### 2. Train
+```bash
+python train.py --data_dir datasets/dinosaurs --out_dir artifacts \
+  --model resnet50 --img_size 256 \
+  --epochs_head 5 --epochs_ft 20 \
+  --lr_head 1e-3 --lr_ft 5e-4 --batch_size 32 \
+  --mixup_alpha 0.2 --label_smoothing 0.1 --amp
 ```
-datasets/dinosaurs/
-  ├─ train/<Clase>/*.jpg
-  ├─ val/<Clase>/*.jpg
-  └─ test/<Clase>/*.jpg
-  ├─ class_index.json
-  ├─ classes.txt
-  └─ dataset_stats.json
+### 3. Despliegue
+```bash
+python frontend.py
 ```
-
----
-
-## Decisiones de diseño
-
-- **Validación + tamaño mínimo**: filtrar errores antes de entrenar evita crashes y basura visual.
-- **Deduplicado global**: reduce fuga de información y sobreajuste por repetición.
-- **Split por clase** (estratificado): asegura representación de todas las clases en train/val/test.
-- **Ratios 70/15/15**: prácticos para prototipos rápidos.
-- **Semilla fija**: reproducibilidad total.
-- **copy vs link**: `copy` es más compatible; `link` ideal si necesitas ahorrar espacio.
-
----
-
-## Errores comunes
-
-- `unrecognized arguments: \` en PowerShell: usar una sola línea en Windows.
-- Symlink fallido en Windows: mantener `--mode copy` o correr PowerShell como admin.
-- Ratios no suman 1.0: el script lanza error.
-- Clases vacías: carpetas con solo imágenes corruptas/miniaturas se omiten (aviso en consola).
-
----
-
-## Próximo paso
-
-Con los splits creados, tu dataset está **listo para entrenamiento**.  
-El siguiente paso es implementar `train.py` con **ResNet18 preentrenada**, congelar el backbone y guardar `artifacts/model.pth` + `artifacts/class_index.json`.
+### 4. Disfruta
