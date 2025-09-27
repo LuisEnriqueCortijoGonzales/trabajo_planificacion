@@ -7,7 +7,7 @@ Este proyecto implementa un sistema de clasificación automática de dinosaurios
 
 El flujo principal consiste en:
 1. **Preparar los datos** (validación, limpieza, quitar duplicados y separación para train, val y test).
-2. **Entrenar modelos de visión profunda** con técnicas modernas de regularización y aumento de datos.
+2. **Entrenar modelos de IA**.
 3. **Desplegar un frontend interactivo**.
 
 ---
