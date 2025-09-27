@@ -15,6 +15,18 @@ El flujo principal consiste en:
 
 ---
 
+
+## Integrantes del Equipo
+
+Un equipo diverso y apasionado de estudiantes está detrás de este proyecto, listo para sumergirse en el reino de las búsquedas y de la indexación multidimensional. Permítanos presentarnos:
+
+|    Luis Cortijo    |    Leandro Machaca    |    Enzo     | Jerimy Sandoval |
+| ----------- | ----------- | ----------- | ----------- |
+| ![](https://avatars.githubusercontent.com/u/84096868?v=4) | ![](https://avatars.githubusercontent.com/u/102132128?s=400&v=4) | ![](https://avatars.githubusercontent.com/u/90939274?v=4) | ![](https://avatars.githubusercontent.com/u/91238497?v=4) |
+| [github.com/LuisEnriqueCortijoGonzales](https://github.com/LuisEnriqueCortijoGonzales) | [github.com/JLeandroJM](https://github.com/JLeandroJM) | [github.com/Enzoc30](https://github.com/Enzoc30) |  [github.com/Jerimy2021](https://github.com/Jerimy2021) |
+
+---
+
 ## Preparación de Datos
 
 Archivo: [`prepare_data.py`](prepare_data.py)
