@@ -1,5 +1,7 @@
 # 🦖 DinoClassifier — Clasificación de Dinosaurios con Deep Learning
 
+link del dataset: https://www.kaggle.com/datasets/larserikrisholm/dinosaur-image-dataset-15-species/suggestions
+
 ## Descripción General
 Este proyecto implementa un sistema de clasificación automática de dinosaurios a partir de imágenes, combinando **preprocesamiento de datos**, **entrenamiento  de modelos CNN** y un **frontend interactivo en Gradio**.  
 
