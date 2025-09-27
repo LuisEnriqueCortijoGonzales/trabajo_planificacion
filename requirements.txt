@@ -1,0 +1,19 @@
+# PyTorch y dependencias principales
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio>=2.0.0
+
+# Dependencias adicionales para el proyecto
+numpy>=1.21.0
+Pillow>=8.3.0
+tqdm>=4.62.0
+
+# Para visualización y análisis (opcional)
+matplotlib>=3.5.0
+seaborn>=0.11.0
+
+# Para manejo de datos (opcional)
+pandas>=1.3.0
+
+# Para logging y configuración (opcional)
+tensorboard>=2.8.0
