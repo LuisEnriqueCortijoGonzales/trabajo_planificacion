@@ -9,9 +9,6 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision import datasets, models, transforms
 import matplotlib.pyplot as plt
 
-# -----------------------
-# Utils
-# -----------------------
 def set_seed(seed=42):
     random.seed(seed); np.random.seed(seed)
     torch.manual_seed(seed); torch.cuda.manual_seed_all(seed)
@@ -60,7 +57,6 @@ def choose_model(name, num_classes):
 def get_class_weights(targets, num_classes):
     cnt = Counter(targets)
     total = sum(cnt.values())
-    # inverso de la frecuencia
     weights = torch.tensor([total / (num_classes * max(1, cnt.get(i,0))) for i in range(num_classes)], dtype=torch.float32)
     return weights
 
@@ -89,7 +85,7 @@ def cutmix_data(x, y, alpha=0.2):
     return x, (y_a, y_b), lam
 
 def criterion_with_ls(outputs, targets, label_smoothing=0.0, class_weights=None):
-    if isinstance(targets, tuple):  # mixup/cutmix
+    if isinstance(targets, tuple):
         y_a, y_b, lam = targets
         return lam * nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)(outputs, y_a) + \
                (1 - lam) * nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)(outputs, y_b)
@@ -126,7 +122,6 @@ def evaluate_full(model, loader, device, num_classes, save_path_png):
         for t,p in zip(y.cpu().numpy(), pred.cpu().numpy()):
             cm[t,p]+=1
     acc = correct/max(1,total)
-    # plot CM
     plt.figure(figsize=(8,7))
     plt.imshow(cm, interpolation='nearest')
     plt.title(f'Confusion Matrix (acc={acc:.3f})')
@@ -137,9 +132,7 @@ def evaluate_full(model, loader, device, num_classes, save_path_png):
     plt.close()
     return loss_sum/max(1,total), acc, cm.tolist()
 
-# -----------------------
-# Train Loop (2 fases)
-# -----------------------
+
 def train_model(args):
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -158,8 +151,7 @@ def train_model(args):
     idx2cls = {i:c for i,c in enumerate(train_ds.classes)}
     (out_dir/"class_index.json").write_text(json.dumps(idx2cls, indent=2), encoding="utf-8")
 
-    # Sampler con pesos (si hay desbalance)
-    targets = [y for _,y in datasets.ImageFolder(data_dir/"train").imgs]  # sin tf para leer targets
+    targets = [y for _,y in datasets.ImageFolder(data_dir/"train").imgs]
     class_counts = Counter(targets)
     print("Train class counts:", dict(class_counts))
     if args.weighted_sampler:
@@ -177,18 +169,15 @@ def train_model(args):
     test_ld  = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
                           num_workers=args.num_workers, pin_memory=True)
 
-    # Modelo
     model = choose_model(args.model, num_classes).to(device)
 
-    # ----- Fase 1: entrenar SOLO la cabeza -----
     for p in model.parameters():
         p.requires_grad = False
     for p in model.parameters():
-        if p.dim() == 2 and p.size(0) == num_classes:  # intento general, pero…
+        if p.dim() == 2 and p.size(0) == num_classes:
             break
     for p in model.modules():
         pass
-    # habilitamos la cabeza explícitamente
     if hasattr(model, "fc"):
         for p in model.fc.parameters(): p.requires_grad = True
     elif hasattr(model, "classifier"):
@@ -213,7 +202,6 @@ def train_model(args):
         model.train(); t0=time.time(); loss_sum=0; seen=0
         for x,y in train_ld:
             x,y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
-            # Mixup/Cutmix (prioridad cutmix si ambos > 0)
             if cutmix_alpha>0:
                 x, (ya,yb), lam = cutmix_data(x,y,cutmix_alpha)
                 targets_mix = (ya,yb,lam)
@@ -249,7 +237,6 @@ def train_model(args):
             if es_counter >= patience:
                 print("EarlyStopping (fase 1)"); break
 
-    # ----- Fase 2: fine-tuning completo -----
     for p in model.parameters(): p.requires_grad = True
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr_ft, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
@@ -273,7 +260,6 @@ def train_model(args):
             if es_counter >= patience:
                 print("EarlyStopping (fase 2)"); break
 
-    # cargar mejor y evaluar en test + CM
     ckpt = torch.load(out_dir/"model.pth", map_location=device)
     model.load_state_dict(ckpt["model_state"])
     test_loss, test_acc, cm = evaluate_full(model, test_ld, device, num_classes, save_path_png=str(out_dir/"confusion_matrix.png"))
@@ -283,9 +269,7 @@ def train_model(args):
     print(f"\n✅ Done. best_val_acc={best_val:.4f} | test_acc={test_acc:.4f}")
     print(f"Métricas: {out_dir/'metrics.json'} | CM: {out_dir/'confusion_matrix.png'} | Pesos: {out_dir/'model.pth'}")
 
-# -----------------------
-# Main
-# -----------------------
+
 def parse_args():
     ap = argparse.ArgumentParser("DinoClassifier Advanced Trainer")
     ap.add_argument("--data_dir", default="datasets/dinosaurs")
@@ -306,7 +290,7 @@ def parse_args():
     ap.add_argument("--num_workers", type=int, default=0)
 
     ap.add_argument("--mixup_alpha", type=float, default=0.2)
-    ap.add_argument("--cutmix_alpha", type=float, default=0.0)  # usa uno u otro; CutMix suele ir mejor con imgs grandes
+    ap.add_argument("--cutmix_alpha", type=float, default=0.0)
     ap.add_argument("--label_smoothing", type=float, default=0.1)
 
     ap.add_argument("--class_weights", action="store_true", help="Pondera pérdida por clase (CrossEntropy)")
